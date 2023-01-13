@@ -12,9 +12,10 @@ commands:
           when: on_fail
           command: |
              echo "Destroying environment: << parameters.workflow_id >> "
-             aws cloudformation delete-stack  --stack-name udapeople-backend-<<parameters.workflow_id>> 
-             aws cloudformation delete-stack  --stack-name udapeople-frontend-<<parameters.workflow_id>> 
+             aws cloudformation delete-stack  --stack-name udapeople-backend-<<parameters.workflow_id>>
              aws s3 rm s3://udapeople-<<parameters.workflow_id>> --recursive
+             aws cloudformation delete-stack  --stack-name udapeople-frontend-<<parameters.workflow_id>>
+
   revert-migrations:
     description: Revert the last migration
     parameters:
@@ -25,15 +26,18 @@ commands:
             name: Revert migrations
             when: on_fail
             command: |
-                # Example: kvdb.io
-                SUCCESS=$(curl --insecure  https://kvdb.io/NinMn2hq2guBw3hAe6gGU7/migration_<< parameters.workflow_id >>)
+                # From: kvdb.io
+                SUCCESS=$(curl --insecure  https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/migration_<< parameters.workflow_id >>)
                 # Logic for reverting the database state
                 if (( $SUCCESS == 1 ));
                 then
                     cd ~/project/backend
                     npm install
                     npm run migration:revert
-                fi  
+                fi
+
+orbs:
+  slack: circleci/slack@4.12.0
             
 jobs:
   build-frontend:
@@ -44,13 +48,16 @@ jobs:
       - run:
           name: Build front-end
           command: |
-            # Your code here
             cd frontend
             npm install
             npm run build
       - save_cache:
           paths: [frontend/node_modules]
           key: frontend-build
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
 
   build-backend:
     docker:
@@ -60,13 +67,16 @@ jobs:
       - run:
           name: Back-end build
           command: |
-             # Your code here
              cd backend
              npm install
              npm run build
       - save_cache:
           paths: [backend/node_modules]
           key: backend-build
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
   
   test-frontend:
     docker:
@@ -80,7 +90,11 @@ jobs:
           command: |
              cd frontend
              npm install
-             npm run test    
+             npm run test
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1 
              
   test-backend:
    docker:
@@ -94,7 +108,12 @@ jobs:
           command: |
              cd backend
              npm install
-             npm run test            
+             npm run test
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
+
   scan-frontend:
     docker:
        - image: circleci/node:13.8.0
@@ -108,6 +127,10 @@ jobs:
              cd frontend
              npm install
              npm audit fix --audit-level=critical --force
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
              
   scan-backend:
     docker:
@@ -122,14 +145,20 @@ jobs:
              cd backend
              npm install
              npm audit fix --audit-level=critical --force
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
+
   deploy-infrastructure:
     docker:
       - image: amazon/aws-cli
     steps:
       - checkout
       - run:
-          name: Install gzip & tar
+          name: Install gzip & tar for workspaces
           command: |
+             yum update -y
              yum install -y gzip tar
             
       - run:
@@ -151,17 +180,23 @@ jobs:
       - run:
           name: Add backend ip to ansible inventory
           command: |
-           aws ec2 describe-instances \
-            --query 'Reservations[*].Instances[*].PublicIpAddress' \
-            --filters "Name=tag:Name,Values= backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-            --output text >> ./.circleci/ansible/inventory.txt
-            cat ./.circleci/ansible/inventory.txt
+           IP_ADDRESS=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+              --output text)
+              echo "[web]" > .circleci/ansible/inventory.txt
+              echo "$IP_ADDRESS" >> .circleci/ansible/inventory.txt
+              cat ./.circleci/ansible/inventory.txt
       - persist_to_workspace:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
-      -   destroy-environment:
-           workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - destroy-environment:
+         workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
 
   configure-infrastructure:
     docker:
@@ -169,7 +204,7 @@ jobs:
     steps:
       - checkout
       - add_ssh_keys:
-         fingerprints: ["1c:50:d1:5d:15:ef:a8:58:72:47:0a:97:74:46:3f:ed"] 
+         fingerprints: ["d5:35:24:ab:6c:22:9e:66:48:16:7e:dd:46:41:7d:59"] 
       - attach_workspace:
           at: ~/
       - run:
@@ -184,6 +219,11 @@ jobs:
             ansible-playbook -i inventory.txt configure-server.yml    
       - destroy-environment:
          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
+      
 
   run-migrations:
     docker:
@@ -197,15 +237,22 @@ jobs:
           command: |
             cd backend
             npm i
-            npm run migrations
+            npm run migrations > migrations_dump.txt
       - run:
           name: Send migration results to kvdb
           command: |
-           if grep -q "has been executed successfully." ./backend/migrations_dump.txt
+           if grep -q "has been executed successfully." ~/project/backend/migrations_dump.txt
            then
            # bucket id created from curl -d 'email=your-email-ID@domain.com' https://kvdb.io
-           curl https://kvdb.io/NinMn2hq2guBw3hAe6gGU7/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
+           curl https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
            fi
+      - destroy-environment:
+         workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
+
   deploy-frontend:
     docker:
      - image: amazon/aws-cli
@@ -241,13 +288,20 @@ jobs:
             npm run build
             tar -czvf artifact-"${CIRCLE_WORKFLOW_ID:0:7}".tar.gz dist
             aws s3 cp dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
+      - destroy-environment:
+         workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
+
   deploy-backend:
     docker:
       - image: python:3.7-alpine3.11
     steps:
       - checkout
       - add_ssh_keys:
-         fingerprints: ["1c:50:d1:5d:15:ef:a8:58:72:47:0a:97:74:46:3f:ed"] 
+         fingerprints: ["d5:35:24:ab:6c:22:9e:66:48:16:7e:dd:46:41:7d:59"] 
       - attach_workspace:
           at: ~/
       - run:
@@ -265,7 +319,7 @@ jobs:
             npm run build
             cd ..
             # Zip the directory
-            tar -C backend -czvf artifact.tar.gz .
+            tar -czvf artifact.tar.gz -C backend
             cp ./artifact.tar.gz  .circleci/ansible/roles/deploy/files
       - run:
           name: Deploy backend
@@ -274,6 +328,13 @@ jobs:
             echo "Contents of the inventory.txt file are..."
             cat inventory.txt
             ansible-playbook -i inventory.txt deploy-backend.yml
+      - destroy-environment:
+         workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
+
   smoke-test:
     docker:
      - image: python:3.7-alpine3.11
@@ -297,7 +358,12 @@ jobs:
             echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
             cat frontend/.env
             echo "${API_URL}"
-            #curl "${API_URL}/api/status" | grep "ok"
+            if curl "${API_URL}/api/status" | grep "ok"
+            then
+              return 0
+            else
+              return 1
+            fi
       - run:
           name: Frontend smoke test.
           command: |
@@ -306,12 +372,16 @@ jobs:
             if curl -s ${URL} | grep "Welcome"
             then
                 # Change this to 0 after the job fails
-              return 0
+              return 1
             else
               return 1
             fi
       - destroy-environment:
-          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+         workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
       - revert-migrations:
           workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}         
 
@@ -326,7 +396,7 @@ jobs:
             export OldWorkflowID=$(aws cloudformation \
                     list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
                     --no-paginate --output text)
-            curl https://kvdb.io/NinMn2hq2guBw3hAe6gGU7/OldWorkflowID  -d "${OldWorkflowID}"        
+            curl https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/OldWorkflowID  -d "${OldWorkflowID}"        
             aws cloudformation deploy \
             --template-file .circleci/files/cloudfront.yml \
             --stack-name udapeople-cloudfront \
@@ -336,7 +406,11 @@ jobs:
       - revert-migrations:
           workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
       - destroy-environment:
-          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+         workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
 
   cleanup:
     docker:
@@ -347,7 +421,7 @@ jobs:
           name: Get old stack workflow id then, remove old stacks and files
           command: |
             # Fetch the Old workflow ID
-            export OldWorkflowID=$(curl --insecure  https://kvdb.io/NinMn2hq2guBw3hAe6gGU7/OldWorkflowID)
+            export OldWorkflowID=$(curl --insecure  https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/OldWorkflowID)
             echo OldWorkflowID: "${OldWorkflowID}"
             echo CIRCLE_WORKFLOW_ID "${CIRCLE_WORKFLOW_ID:0:7}"
             # Fetch the stack names          
@@ -365,6 +439,13 @@ jobs:
                echo "Frontend stack is now deleted."
                #aws s3 rm s3://udapeople-${OldWorkflowID} --recursive
             fi
+      - destroy-environment:
+         workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+      - slack/notify:
+          channel: tests
+          event: fail
+          template: basic_fail_1
+
 workflows:
   default:
     jobs:
@@ -382,7 +463,7 @@ workflows:
           requires: [test-frontend, test-backend, scan-frontend, scan-backend]
           filters:
             branches:
-              only: [master]
+              only: [main]
       - configure-infrastructure:
           requires: [deploy-infrastructure]
       - run-migrations:
