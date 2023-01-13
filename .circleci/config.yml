@@ -233,7 +233,7 @@ jobs:
       - attach_workspace:
           at: ~/
       - run:
-          name: Run migrations
+          name: Run migrations.
           command: |
             cd backend
             npm i
