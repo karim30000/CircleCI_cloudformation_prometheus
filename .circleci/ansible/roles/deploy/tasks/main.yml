@@ -1,0 +1,41 @@
+- name: Install tar,gzip && gunzip
+  become: true
+  apt:
+    name: '{{ item }}'
+    update_cache: yes
+  with_items: 
+    - tar
+    - gzip
+    - gunzip
+
+- name: "Creates new directory for backend"
+  file:
+    path: ~/app
+    state: directory
+
+- name: "Copy build archive"
+  copy:
+    src: artifact.tar.gz
+    dest: "~/app/artifact.tar.gz"
+
+- name: "Unzip build archive"
+  shell: |
+    cd ~/app
+    tar -xvzf artifact.tar.gz
+    
+- name: "Install dependencies && executing the node"
+  shell: |
+    cd ~/app
+    npm install
+    pm2 stop default
+    pm2 start npm -- start
+  register: execute_node
+  environment:
+    ENVIRONMENT: "production"
+    TYPEORM_CONNECTION: "{{ lookup('env','TYPEORM_CONNECTION') }}"
+    TYPEORM_HOST: "{{ lookup('env','TYPEORM_HOST') }}"
+    TYPEORM_USERNAME: "{{ lookup('env','TYPEORM_USERNAME') }}"
+    TYPEORM_PASSWORD: "{{ lookup('env','TYPEORM_PASSWORD') }}"
+    TYPEORM_DATABASE: "{{ lookup('env','TYPEORM_DATABASE') }}"
+    TYPEORM_MIGRATIONS: "{{ lookup('env','TYPEORM_MIGRATIONS') }}"
+    TYPEORM_ENTITIES: "{{ lookup('env','TYPEORM_ENTITIES') }}"
