@@ -376,7 +376,7 @@ jobs:
           template: basic_fail_1
 
 workflows:
-  default:
+  udacity:
     jobs:
       - build-frontend
       - build-backend
