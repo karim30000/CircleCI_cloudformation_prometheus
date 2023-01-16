@@ -397,11 +397,12 @@ jobs:
             export OldWorkflowID=$(aws cloudformation \
                     list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
                     --no-paginate --output text)
-            curl https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/OldWorkflowID  -d "${OldWorkflowID}"        
+            curl https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/OldWorkflowID  -d "${OldWorkflowID}"
+            echo "old workflow id:${OldWorkflowID}"
             aws cloudformation deploy \
             --template-file .circleci/files/cloudfront.yml \
             --stack-name udapeople-cloudfront \
-            --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
+            --parameter-overrides Workflow_ID="${CIRCLE_WORKFLOW_ID:0:7}" \
             --tags project=udapeople 
             echo "old workflow id:${OldWorkflowID}"
       - revert-migrations:
@@ -438,7 +439,6 @@ jobs:
                echo "Backend stack is now deleted."
                aws cloudformation delete-stack --stack-name "udapeople-frontend-${OldWorkflowID}"
                echo "Frontend stack is now deleted."
-               #aws s3 rm s3://udapeople-${OldWorkflowID} --recursive
             fi
       - destroy-environment:
          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
