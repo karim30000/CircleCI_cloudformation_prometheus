@@ -1,5 +1,0 @@
-my public github repo: https://github.com/karim30000/udacity
-my s3 endpoint: http://udapeople-c79681d.s3-website-us-east-1.amazonaws.com
-my cloudfront domain name: https://d2ez5a3396npff.cloudfront.net
-my backend endpoint health: http://3.87.239.225:3030/api/status
-my prometheus server: http://ec2-3-86-140-55.compute-1.amazonaws.com:9090
