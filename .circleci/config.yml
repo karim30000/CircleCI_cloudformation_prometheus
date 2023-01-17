@@ -392,17 +392,17 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Update cloudfront distribution
+          name: Update cloudfront distribution.
           command: |
             export OldWorkflowID=$(aws cloudformation \
-                    list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
+                    list-exports --query "Exports[?Name==\`WorkflowIDD\`].Value" \
                     --no-paginate --output text)
             curl https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/OldWorkflowID  -d "${OldWorkflowID}"
             echo "old workflow id:${OldWorkflowID}"
             aws cloudformation deploy \
             --template-file .circleci/files/cloudfront.yml \
             --stack-name udapeople-cloudfront \
-            --parameter-overrides WorkflowIDD="${CIRCLE_WORKFLOW_ID:0:7}" \
+            --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
             --tags project=udapeople 
             echo "old workflow id:${OldWorkflowID}"
       - revert-migrations:
