@@ -244,7 +244,7 @@ jobs:
            if grep -q "has been executed successfully." ~/project/backend/migrations_dump.txt
            then
            # bucket id created from curl -d 'email=your-email-ID@domain.com' https://kvdb.io
-           curl https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
+           curl https://kvdb.io/FmcgScqS89NSrDBFbHco3W/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
            fi
       - destroy-environment:
          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
@@ -397,7 +397,7 @@ jobs:
             export OldWorkflowID=$(aws cloudformation \
                     list-exports --query "Exports[?Name==\`WorkflowIDD\`].Value" \
                     --no-paginate --output text)
-            curl https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/OldWorkflowID  -d "${OldWorkflowID}"
+            curl https://kvdb.io/FmcgScqS89NSrDBFbHco3W/OldWorkflowID  -d "${OldWorkflowID}"
             echo "old workflow id:${OldWorkflowID}"
             aws cloudformation deploy \
             --template-file .circleci/files/cloudfront.yml \
@@ -423,7 +423,7 @@ jobs:
           name: Get old stack workflow id then, remove old stacks and files
           command: |
             # Fetch the Old workflow ID
-            export OldWorkflowID=$(curl --insecure  https://kvdb.io/4i1C9J9d1q3DV4D6jSYe24/OldWorkflowID)
+            export OldWorkflowID=$(curl --insecure  https://kvdb.io/FmcgScqS89NSrDBFbHco3W/OldWorkflowID)
             echo OldWorkflowID: "${OldWorkflowID}"
             echo CIRCLE_WORKFLOW_ID "${CIRCLE_WORKFLOW_ID:0:7}"
             if [[ "${CIRCLE_WORKFLOW_ID:0:7}" != "${OldWorkflowID}" ]]
